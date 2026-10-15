@@ -1,0 +1,7 @@
+# DECISIONS.md
+
+1. **Indexes.** On attendance_logs I made a unique (emp_code, date) index, so one employee can never have two records for a day and punch-in is race-safe. I made (date desc, emp_code asc) so the list comes out already sorted newest first without a separate sort. I also made (status, date desc, emp_code) for the status filter and (emp_code, punch_in desc) to find the record to punch out. On employees I made unique emp_code, (department, emp_code) for the list, and (department, joined_on) and (joined_on) for headcount. I rejected an index on name, because nothing searches by name, employees are found by emp_code.
+2. **Punch-in race.** Both requests check the employee and build the record, then both call insert_one. MongoDB lets the first one in. The second hits the unique (emp_code, date) index and gets a duplicate-key error, which I turn into 409. The first client gets 201. The database decides, there is no check-then-insert.
+3. **Ties.** I rank everyone first with $rank (1, 2, 2, 4), then keep rank <= limit. So tied people at the cutoff are all returned, and there can be more rows than limit.
+4. **Headcount.** The summary starts from employees (joined on or before month end) and left-joins their logs. No logs gives an empty list, which I turn into zeros, so they still count.
+5. **100x data.** I would keep monthly totals per employee, updated on each punch or correction, so analytics read small documents instead of scanning raw records.
